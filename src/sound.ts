@@ -1,12 +1,21 @@
 import { ExtensionContext } from 'vscode'
+import * as vscode from 'vscode'
 import symbolPattern from './patterns/all'
 import letterPattern from './patterns/freqTable'
 
-const player = require('play-sound')()
+// On Linux, `aplay` (ALSA) only handles raw PCM/WAV audio, not MP3.
+// Using it to play MP3 files produces garbled noise. Restrict the candidate
+// player list to programs that actually support MP3.
+const playerOptions =
+  process.platform === 'linux'
+    ? { players: ['mplayer', 'mpg123', 'mpg321', 'play', 'cvlc'] }
+    : {}
+const player = require('play-sound')(playerOptions)
 
 let theme: Theme = 'natural'
 let playQueue: any[] = []
 let context: ExtensionContext
+let audioErrorShown = false
 
 export const init = (ctx: ExtensionContext) => {
   context = ctx
@@ -36,6 +45,14 @@ export const play = (sound: string, t: Theme = theme) => {
     player.play(filePath, (err: any) => {
       if (err && !err.killed) {
         console.error(err)
+        if (!audioErrorShown) {
+          audioErrorShown = true
+          const msg =
+            process.platform === 'linux'
+              ? 'Typatone: No MP3-capable audio player found. Install one and restart VS Code (e.g. `sudo apt install mpg123`).'
+              : 'Typatone: Failed to play audio. Check the developer console for details.'
+          vscode.window.showErrorMessage(msg)
+        }
       }
     })
   )
